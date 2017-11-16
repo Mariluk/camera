@@ -2,6 +2,8 @@
 #import <AVFoundation/AVFoundation.h>
 #import <libkern/OSAtomic.h>
 
+FlutterMethodChannel *flutterChannel = nil;
+
 @interface SavePhotoDelegate : NSObject <AVCapturePhotoCaptureDelegate>
 @property(readonly, nonatomic) NSString *filename;
 @property(readonly, nonatomic) FlutterResult result;
@@ -154,7 +156,7 @@
   for (AVMetadataObject *metadata in metadataObjects)
   {
     NSString *detectionString = [(AVMetadataMachineReadableCodeObject *)metadata stringValue];
-    NSLog(@"%@", detectionString);
+    [flutterChannel invokeMethod:@"barcode" arguments:detectionString];
   }
 }
 
@@ -202,6 +204,7 @@
       [FlutterMethodChannel methodChannelWithName:@"camera" binaryMessenger:[registrar messenger]];
   CameraPlugin *instance = [[CameraPlugin alloc] initWithRegistry:[registrar textures]];
   [registrar addMethodCallDelegate:instance channel:channel];
+  flutterChannel = channel;
 }
 
 - (instancetype)initWithRegistry:(NSObject<FlutterTextureRegistry> *)registry
