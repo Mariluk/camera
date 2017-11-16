@@ -45,12 +45,13 @@
 }
 @end
 
-@interface Cam : NSObject <FlutterTexture, AVCaptureVideoDataOutputSampleBufferDelegate>
+@interface Cam : NSObject <FlutterTexture, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureMetadataOutputObjectsDelegate>
 @property(readonly, nonatomic) int64_t textureId;
 @property(nonatomic, copy) void (^onFrameAvailable)();
 @property(readonly, nonatomic) AVCaptureSession *captureSession;
 @property(readonly, nonatomic) AVCaptureDevice *captureDevice;
 @property(readonly, nonatomic) AVCapturePhotoOutput *capturePhotoOutput;
+@property(readonly, nonatomic) AVCaptureMetadataOutput *captureMetadataOutput;
 @property(readonly, nonatomic) dispatch_queue_t queue;
 @property(readonly, nonatomic) dispatch_semaphore_t closingSemaphore;
 @property(readonly) CVPixelBufferRef volatile latestPixelBuffer;
@@ -67,7 +68,7 @@
   self = [super init];
   NSAssert(self, @"super init cannot be nil");
   _captureSession = [[AVCaptureSession alloc] init];
-  _captureSession.sessionPreset = AVCaptureSessionPresetLow;
+  _captureSession.sessionPreset = AVCaptureSessionPresetHigh;
   _captureDevice = [AVCaptureDevice deviceWithUniqueID:cameraName];
   NSError *error = nil;
   AVCaptureInput *input = [AVCaptureDeviceInput deviceInputWithDevice:_captureDevice error:&error];
@@ -95,8 +96,15 @@
   [_captureSession addInputWithNoConnections:input];
   [_captureSession addOutputWithNoConnections:output];
   [_captureSession addConnection:connection];
+
   _capturePhotoOutput = [AVCapturePhotoOutput new];
   [_captureSession addOutput:_capturePhotoOutput];
+
+  _captureMetadataOutput = [AVCaptureMetadataOutput new];
+  [_captureMetadataOutput setMetadataObjectsDelegate:self queue:dispatch_get_main_queue()];
+  [_captureSession addOutput:_captureMetadataOutput];
+  _captureMetadataOutput.metadataObjectTypes = @[AVMetadataObjectTypeQRCode];
+
   return self;
 }
 
@@ -136,6 +144,17 @@
   if (_onFrameAvailable)
   {
     _onFrameAvailable();
+  }
+}
+
+- (void)captureOutput:(AVCaptureOutput *)output
+    didOutputMetadataObjects:(NSArray<AVMetadataObject *> *)metadataObjects
+              fromConnection:(AVCaptureConnection *)connection
+{
+  for (AVMetadataObject *metadata in metadataObjects)
+  {
+    NSString *detectionString = [(AVMetadataMachineReadableCodeObject *)metadata stringValue];
+    NSLog(@"%@", detectionString);
   }
 }
 
