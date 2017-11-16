@@ -67,11 +67,12 @@ class CameraDescription {
   CameraDescription(
       this.name, this.lensDirection, this.previewFormats, this.captureFormats);
 
-  Future<CameraId> open(CameraFormat previewFormat, CameraFormat captureFormat) async {
+  Future<CameraId> open(CameraFormat previewFormat, CameraFormat captureFormat,
+      [handler(String barcode)]) async {
     try {
       int surfaceId = await _channel.invokeMethod('create',
           {'cameraName': name, 'previewWidth': previewFormat.width, 'previewHeight': previewFormat.height, 'captureWidth': captureFormat.width, 'captureHeight': captureFormat.height});
-      return new CameraId._internal(surfaceId);
+      return new CameraId._internal(surfaceId, handler);
     } on PlatformException catch (e) {
       throw new CameraException(e.code, e.message);
     }
@@ -106,11 +107,19 @@ class CameraException implements Exception {
 class CameraId {
   final int textureId;
 
-  CameraId._internal(int surfaceId)
+  CameraId._internal(int surfaceId, handler(String barcode))
       : textureId = surfaceId,
         events = new EventChannel('cameraPlugin/cameraEvents$surfaceId')
             .receiveBroadcastStream()
-            .map(_parseCameraEvent);
+            .map(_parseCameraEvent) {
+    if (handler != null) {
+      _channel.setMethodCallHandler((call) {
+        if (call.method == "barcode") {
+          handler(call.arguments);
+        }
+      });
+    }
+  }
 
   final Stream<CameraEvent> events;
 
